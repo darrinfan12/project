@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Expert Pipeline walkthrough</title>
+<style>
+:root{--ink:#1b2440;--mut:#667089;--line:#dfe4f0;--bg:#f7f9fe;--acc:#3a5bc7;--accs:#e8edfb;--red:#b8352d;--reds:#fbeceb;--amb:#8a5a06;--ambs:#fdf3df;--grn:#23724a;--grns:#e6f4ec;--dark:#161b2e}
+*{box-sizing:border-box}
+html,body{margin:0;font:15px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:transparent}
+.wrap{border:1px solid var(--line);border-radius:14px;background:var(--bg);padding:16px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.eyebrow{font-size:12px;letter-spacing:.06em;color:var(--mut);text-transform:uppercase}
+button{font:inherit;color:var(--acc);background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.stage{position:relative;height:340px;margin:12px 0 10px;border-radius:12px;background:linear-gradient(160deg,#e9eefc,#f9fafe);overflow:hidden}
+.win{position:absolute;inset:18px 18px 52px 18px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(40,60,120,.14);overflow:hidden}
+.bar{display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--mut)}
+.bar i{width:8px;height:8px;border-radius:50%;background:#d5dbea}
+.bar b{margin-left:8px;font-weight:600;color:var(--ink)}
+.bar em{margin-left:auto;font-style:normal;font-weight:700;letter-spacing:.05em;color:var(--acc);font-size:11px}
+.scene{position:absolute;inset:34px 0 0 0;padding:12px 16px;opacity:0;pointer-events:none;transition:opacity .35s;overflow:auto}
+.scene.on{opacity:1;pointer-events:auto}
+.scene:not(.on) *{transition:none!important}
+.a{opacity:0;transform:translateY(6px)}
+.scene.on .a{opacity:1;transform:none;transition:opacity .45s ease var(--d,0s),transform .45s ease var(--d,0s)}
+.fill{height:100%;width:0;border-radius:4px;background:var(--acc)}
+.scene.on .fill{width:var(--w);transition:width .9s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+.trk{height:12px;background:var(--accs);border-radius:4px;overflow:hidden}
+.tr{display:grid;grid-template-columns:70px 1fr 1.4fr;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px}
+.th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tr.q{grid-template-columns:90px 1fr 90px}
+.tr.sel{background:var(--accs);border-radius:6px}
+.chip{font-style:normal;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;display:inline-block;white-space:nowrap}
+.r{background:var(--reds);color:var(--red)}.g{background:var(--grns);color:var(--grn)}.b{background:var(--accs);color:var(--acc)}
+.sum,.call{margin-top:12px;padding:8px 12px;border-radius:8px;font-size:14px}
+.sum{background:var(--accs)}.sum em{font-style:normal;color:var(--mut);margin:0 4px}.sum .gc{color:var(--grn)}
+.call{background:var(--ambs);color:var(--amb)}
+.fr,.lv{display:grid;grid-template-columns:96px 1fr 92px;gap:10px;align-items:center;margin:9px 0;font-size:13px}
+.lv{grid-template-columns:200px 1fr 50px}
+.fr span,.lv span{font-weight:700;text-align:right}
+.two{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+h4{margin:0 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.det,.pil{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.det h5{margin:0 0 8px;font-size:14px}
+.tl{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid var(--line);font-size:13px}
+.tl li{position:relative;margin:0 0 9px}
+.tl li::before{content:"";position:absolute;left:-22px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+.tl small{color:var(--mut);margin-left:6px}
+.tl li.gap{color:var(--red)}.tl li.gap::before{background:#fff;border:2px solid var(--red)}
+.rsn{font-size:13px;margin-top:6px}
+.big{font-size:17px;margin:4px 0}.big b{color:var(--grn)}
+.note{font-size:12px;color:var(--mut);margin:6px 0 0}
+.cap{display:grid;grid-template-columns:70px 1fr 56px;gap:8px;align-items:center;margin:5px 0;font-size:12px}
+.cap span:last-child{font-weight:700;text-align:right}
+.cmd{position:absolute;left:10px;bottom:10px;width:min(330px,70%);background:var(--dark);color:#e9edfb;border-radius:8px;padding:8px 10px 9px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;box-shadow:0 10px 24px rgba(10,15,40,.35)}
+.cd{display:flex;gap:4px;margin-bottom:5px}.cd i{width:7px;height:7px;border-radius:50%;background:#46507a}
+#cl::after{content:"\258D";color:#8ea3ee;animation:bl 1s steps(2) infinite}
+#co{color:#8fd7ad;min-height:1.45em}
+@keyframes bl{50%{opacity:0}}
+h3{margin:4px 0 2px;font-size:19px}#cb{margin:0;color:var(--ink);min-height:44px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.pill{font-size:13px;padding:4px 10px;border-radius:999px;color:var(--mut)}
+.pill[aria-current=step]{background:var(--accs);border-color:var(--acc);color:var(--acc);font-weight:600}
+.ctl{display:flex;align-items:center;gap:8px}
+#sl{flex:1;accent-color:var(--acc)}
+.rm *{animation:none!important;transition:none!important}
+.rm .a{opacity:1;transform:none}.rm .fill{width:var(--w)}
+@media(max-width:640px){.stage{height:470px}.two{grid-template-columns:1fr}.lv{grid-template-columns:1fr 1fr 46px}.cmd{width:calc(100% - 20px)}.win{inset:12px 12px 62px}}
+@media(max-width:640px){.top{flex-wrap:wrap}.tr{grid-template-columns:42px 85px 1fr;font-size:11px}.tr.q{grid-template-columns:80px 1fr 70px}.chip{white-space:normal;font-size:10px;padding:2px 4px}.bar em{font-size:8px}.fr{grid-template-columns:65px 1fr 78px;font-size:11px}.scene{padding:10px}.win{inset:8px 8px 80px}.cmd{font-size:10px}.lv{font-size:11px}} </style></head>
+<body>
+<div class="wrap">
+ <div class="top"><div class="eyebrow">Guided · 30-second walkthrough</div><button id="pp">Play walkthrough</button></div>
+ <div class="stage">
+  <div class="win" aria-hidden="true">
+   <div class="bar"><i></i><i></i><i></i><b id="wt">pipeline.csv</b><em>ILLUSTRATIVE · DUMMY DATA</em></div>
+
+   <section class="scene">
+    <div class="tr th"><span>CSV row</span><span>Record</span><span>Check</span></div>
+    <div class="tr a" style="--d:.1s"><span>2</span><span>DEMO-0001</span><span><i class="chip r">Duplicate ID · held</i></span></div>
+    <div class="tr a" style="--d:.35s"><span>3</span><span>DEMO-0002</span><span><i class="chip g">Valid</i></span></div>
+    <div class="tr a" style="--d:.6s"><span>1802</span><span>DEMO-0001</span><span><i class="chip r">Duplicate ID · held</i></span></div>
+    <div class="tr a" style="--d:.85s"><span>1803</span><span>DEMO-BAD-1</span><span><i class="chip r">Missing channel · held</i></span></div>
+    <div class="tr a" style="--d:1.1s"><span>1804</span><span>DEMO-BAD-2</span><span><i class="chip r">Out-of-order date · held</i></span></div>
+    <div class="sum a" style="--d:1.7s"><b>1,803</b> rows<em>→</em><b>4</b> held (0.2%)<em>→</em><b class="gc">1,799</b> valid</div>
+   </section>
+
+   <section class="scene">
+    <div class="fr a" style="--d:.1s"><label>Contacted</label><div class="trk"><div class="fill" style="--w:100%;--d:.2s"></div></div><span>1,799</span></div>
+    <div class="fr a" style="--d:.3s"><label>Responded</label><div class="trk"><div class="fill" style="--w:39.2%;--d:.5s"></div></div><span>705 · 39%</span></div>
+    <div class="fr a" style="--d:.5s"><label>Qualified</label><div class="trk"><div class="fill" style="--w:23.6%;--d:.8s"></div></div><span>425 · 60%</span></div>
+    <div class="fr a" style="--d:.7s"><label>Activated</label><div class="trk"><div class="fill" style="--w:13%;--d:1.1s"></div></div><span>234 · 55%</span></div>
+    <div class="call a" style="--d:2s"><b>153 of 425</b> qualified records (36%) have waited 14+ days with no first task.</div>
+   </section>
+
+   <section class="scene two">
+    <div>
+     <div class="tr th q"><span>Record</span><span>Channel</span><span>Days</span></div>
+     <div class="tr q sel a" style="--d:.1s"><span>DEMO-1039</span><span>Direct outreach</span><span><i class="chip r">109 · High</i></span></div>
+     <div class="tr q a" style="--d:.3s"><span>DEMO-1533</span><span>Conferences</span><span><i class="chip r">107 · High</i></span></div>
+     <div class="tr q a" style="--d:.5s"><span>DEMO-0380</span><span>Prof. communities</span><span><i class="chip r">106 · High</i></span></div>
+     <div class="tr q a" style="--d:.7s"><span>DEMO-1586</span><span>Referrals</span><span><i class="chip r">105 · High</i></span></div>
+    </div>
+    <div class="det a" style="--d:.9s">
+     <h5>DEMO-1039 · 109d waiting</h5>
+     <ol class="tl">
+      <li class="a" style="--d:1.2s"><b>Contacted</b> Jul 07</li>
+      <li class="a" style="--d:1.5s"><b>Responded</b> Jul 08<small>+1d</small></li>
+      <li class="a" style="--d:1.8s"><b>Qualified</b> Jul 11<small>+3d</small></li>
+      <li class="gap a" style="--d:2.1s"><b>Activated</b> no event recorded</li>
+     </ol>
+     <div class="rsn a" style="--d:2.8s">Reason saved <i class="chip b">Onboarding confusion</i></div>
+    </div>
+   </section>
+
+   <section class="scene two">
+    <div>
+     <h4 class="a" style="--d:.1s">Illustrative levers · added activations</h4>
+     <div class="lv a" style="--d:.2s"><label>Direct outreach · response</label><div class="trk"><div class="fill" style="--w:100%;--d:.4s"></div></div><span>+22.3</span></div>
+     <div class="lv a" style="--d:.4s"><label>University partnerships · qualification</label><div class="trk"><div class="fill" style="--w:88%;--d:.6s"></div></div><span>+19.7</span></div>
+     <div class="lv a" style="--d:.6s"><label>Professional communities · activation</label><div class="trk"><div class="fill" style="--w:76%;--d:.8s"></div></div><span>+16.9</span></div>
+     <h4 class="a" style="--d:1.2s;margin-top:12px">Capacity for 100 activations</h4>
+     <div class="cap a" style="--d:1.3s"><span>Needed</span><div class="trk"><div class="fill" style="--w:79.4%;--d:1.4s"></div></div><span>143.0h</span></div>
+     <div class="cap a" style="--d:1.5s"><span>Available</span><div class="trk"><div class="fill" style="--w:100%;--d:1.6s"></div></div><span>180.0h</span></div>
+    </div>
+    <div class="pil a" style="--d:2.2s">
+     <h4>Pilot · Professional communities</h4>
+     <p class="big">36 stalled × 50% = <b>+18.0</b></p>
+     <p style="margin:0;font-size:13px">+8% vs 234 current activations</p>
+     <p class="note">Feasibility pilot only. A powered test needs about 120 per arm for a 37% → 55% lift.</p>
+    </div>
+   </section>
+  </div>
+  <div class="cmd" aria-hidden="true"><div class="cd"><i></i><i></i><i></i></div><div id="cl"></div><div id="co"></div></div>
+ </div>
+ <div aria-live="polite"><h3 id="ct"></h3><p id="cb"></p></div>
+ <div class="pills" role="group" aria-label="Chapters">
+  <button class="pill">1 Validate</button><button class="pill">2 Find the stall</button><button class="pill">3 Review</button><button class="pill">4 Size and test</button>
+ </div>
+ <div class="ctl">
+  <button id="pv" aria-label="Previous chapter">←</button>
+  <input id="sl" type="range" min="0" max="300" value="0" aria-label="Walkthrough position">
+  <button id="nx" aria-label="Next chapter">→</button>
+  <button id="rp">Replay</button>
+ </div>
+</div>
+<script>
+(()=>{
+const CH=[
+{t:'Validate the export',b:'4 of 1,803 rows are held before any metric is calculated, leaving 1,799 valid records. Nothing is silently dropped.',c:'$ validate pipeline.csv',o:'4 of 1,803 rows held (0.2%)',a:0,z:7},
+{t:'Find the stall',b:'39% reply, 60% qualify, 55% activate. 153 of 425 qualified records (36%) have waited 14+ days with no first task.',c:'$ flag qualified --no-first-task --days 14',o:'153 stalled records',a:7,z:15},
+{t:'Review and record why',b:'Open the longest-waiting record, read its timeline, and save a reason, so the cause is recorded, not assumed.',c:'$ review DEMO-1039 --save-reason',o:'reason saved (session only)',a:15,z:22},
+{t:'Size and test',b:'234 illustrative activations are the current baseline. Compare potential improvements, estimate capacity, and design a pilot. No real impact is claimed.',c:'$ size levers && plan pilot',o:'+18.0 illustrative, feasibility pilot',a:22,z:30}];
+const TT=['pipeline.csv','overview','follow-up queue','experiment plan'],TOT=30;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const sc=$$('.scene'),pills=$$('.pill'),sl=$('#sl'),pp=$('#pp');
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)document.body.classList.add('rm');
+let T=0,cur=-1,playing=false,last=0;
+const chOf=t=>{for(let i=0;i<CH.length;i++)if(t<CH[i].z)return i;return CH.length-1};
+function show(i){sc.forEach(s=>s.classList.remove('on'));void document.body.offsetWidth;sc[i].classList.add('on')}
+function render(t,full,force){
+ const i=chOf(t),c=CH[i];
+ if(i!==cur||force){cur=i;show(i);$('#ct').textContent=c.t;$('#cb').textContent=c.b;$('#wt').textContent=TT[i];pills.forEach((p,k)=>p.setAttribute('aria-current',k===i?'step':'false'))}
+ const p=(t-c.a)/(c.z-c.a),n=full?c.c.length:Math.floor(Math.min(1,p/.4)*c.c.length);
+ $('#cl').textContent=c.c.slice(0,n);$('#co').textContent=(full||p>.45)?'→ '+c.o:'';
+ sl.value=Math.round(t*10)}
+function label(){pp.textContent=playing?'Pause':(T>=TOT-.05?'Play again':'Play walkthrough')}
+function tick(ts){if(!playing)return;T=Math.min(TOT,T+(ts-last)/1000);last=ts;render(T);if(T>=TOT){playing=false;label();return}requestAnimationFrame(tick)}
+function play(){if(T>=TOT-.05||T<.05){T=0;render(0,false,true)}playing=true;last=performance.now();label();requestAnimationFrame(tick)}
+function pause(){playing=false;label()}
+function jump(t){playing=false;T=t;render(T,true,true);label()}
+pp.onclick=()=>playing?pause():play();
+$('#rp').onclick=()=>{T=0;render(0,false,true);play()};
+sl.oninput=()=>{playing=false;T=sl.value/10;render(T,true);label()};
+$('#pv').onclick=()=>{const i=chOf(T);jump(T-CH[i].a>1.5||i===0?CH[i].a:CH[i-1].a)};
+$('#nx').onclick=()=>{const i=chOf(T);jump(i<CH.length-1?CH[i+1].a:TOT-.01)};
+pills.forEach((p,k)=>p.onclick=()=>jump(CH[k].a));
+render(0,true);
+})();
+</script>
+</body></html>

@@ -1,0 +1,14 @@
+<script>
+const d=window.parent.document;
+if(window.parent.__chapterCleanup)window.parent.__chapterCleanup();
+const reduced=window.parent.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const links=[...d.querySelectorAll('.chapter-nav a')];
+const sections=[...d.querySelectorAll('.chapter-heading')];
+function activate(id){links.forEach(a=>{const active=a.hash==='#'+id;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current')})}
+function click(e){const a=e.target.closest('.chapter-nav a,.section-link');if(!a)return;const target=d.getElementById(a.hash.slice(1));if(!target)return;e.preventDefault();target.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'});activate(target.id)}
+d.addEventListener('click',click);
+const root=d.querySelector('[data-testid="stMain"]');
+function update(){const top=root?root.getBoundingClientRect().top:0;let current=sections[0];for(const s of sections){if(s.getBoundingClientRect().top<=top+180)current=s}if(current)activate(current.id)}
+const scroller=root||window.parent;scroller.addEventListener('scroll',update,{passive:true});update();
+window.parent.__chapterCleanup=()=>{d.removeEventListener('click',click);scroller.removeEventListener('scroll',update)};
+</script>
