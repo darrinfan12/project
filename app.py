@@ -282,7 +282,7 @@ st.caption('The included daily_digest.py creates a local digest and previous-run
 repo=os.getenv('PUBLIC_REPO_URL','https://github.com/darrinfan12/project')
 if repo:st.link_button('Inspect the source repository',repo)
 else:
-    source_files=['strategy.py','app.py','engine.py','views.py','sourcing_ui.py','outreach.py','daily_digest.py','requirements.txt','README.md','style.html','scroll.html','walkthrough.html','.streamlit/config.toml']
+    source_files=['decision.py','strategy.py','app.py','engine.py','views.py','sourcing_ui.py','outreach.py','daily_digest.py','requirements.txt','README.md','style.html','scroll.html','walkthrough.html','.streamlit/config.toml']
     import io,zipfile
     buffer=io.BytesIO()
     with zipfile.ZipFile(buffer,'w',zipfile.ZIP_DEFLATED) as archive:
