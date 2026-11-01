@@ -73,7 +73,7 @@ def decision_ui(results,wage,persona,recommendation):
             output=row.Contacts*np.prod(rates)
             rows.append({'Channel':row.Channel,'Case':case.Case,'Expected activations':output,'Cost / activation':row['Modeled cost $']/output if output else np.nan})
     stress=pd.DataFrame(rows)
-    st.altair_chart(alt.Chart(stress).mark_bar().encode(x='Case:N',y='Expected activations:Q',color='Case:N',column='Channel:N',tooltip=['Channel','Case','Expected activations','Cost / activation']).properties(width=115,height=180),use_container_width=False)
+    st.altair_chart(alt.Chart(stress).mark_bar().encode(x=alt.X('Expected activations:Q',title='Expected activations (modeled)'),y='Channel:N',yOffset=alt.YOffset('Case:N',sort=['Conservative','Base','Optimistic']),color='Case:N',tooltip=['Channel','Case','Expected activations','Cost / activation']).properties(height=380),use_container_width=True)
     winners={}
     for case,g in stress.groupby('Case'):
         finite=g.dropna(subset=['Cost / activation']);winners[case]=finite.loc[finite['Cost / activation'].idxmin()].Channel if not finite.empty else 'None (zero activations)'
