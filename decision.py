@@ -6,7 +6,7 @@ import pandas as pd
 import altair as alt
 import streamlit as st
 from scipy.optimize import milp, Bounds, LinearConstraint
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
@@ -23,12 +23,13 @@ def allocate(r,limits,budget,hours):
     x=np.rint(answer.x).astype(int)
     return pd.DataFrame({'Channel':r.Channel.to_list(),'Allocated contacts':x,'Expected activations':x*yield_,'Cost $':x*unit_cost,'Hours':x*unit_hours})
 
-def report_pdf(persona,ranking,budget,hours,allocation,recommendation,range_text,assumptions):
+def report_pdf(persona,ranking,budget,hours,allocation,recommendation,range_text,assumptions,details=None):
     buf=io.BytesIO();styles=getSampleStyleSheet();styles['Normal'].fontSize=9;styles['Normal'].leading=12
     doc=SimpleDocTemplate(buf,pagesize=(612,792),leftMargin=40,rightMargin=40,topMargin=32,bottomMargin=30)
     def p(t):return Paragraph(escape(str(t)),styles['Normal'])
     story=[Paragraph('Growth strategy | Decision brief',styles['Title']),p('Darrin Fan · Illustrative model · Not AfterQuery operating data'),Spacer(1,10),p('Target: maximize modeled first-task completions. Persona: '+persona),p(f'Allocation window: one week. Budget: ${budget:,.0f}. Staff capacity: {hours:,.1f} hours.'),Spacer(1,10)]
-    rows=[[p(x) for x in ['Channel','Activations','Cost / activation','Qualified yield']]]
+    story += [Paragraph('Channel benchmark — entered plan, not allocated output',styles['Heading3']),p('Each row uses its entered outreach volume. Equal volumes form a standardized comparison; edited volumes do not.')]
+    rows=[[p(x) for x in ['Channel','First-task completions','Cost / completion','Qualified yield']]]
     for _,r in ranking.head(6).iterrows():rows.append([p(str(r.Channel)[:55]),p(f'{r["Modeled activations"]:.1f}'),p('Undefined' if pd.isna(r['Cost / activation $']) else f'${r["Cost / activation $"]:.1f}'),p(f'{r["Qualified yield"]:.1%}')])
     table=Table(rows,colWidths=[210,75,115,132]);table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#edf2fa')),('VALIGN',(0,0),(-1,-1),'TOP'),('BOTTOMPADDING',(0,0),(-1,-1),7),('LINEBELOW',(0,0),(-1,-1),.3,colors.lightgrey)]));story+=[table,Spacer(1,10)]
     if len(ranking)>6:story.append(p('Top six by modeled cost efficiency shown; full comparison is available in the app.'))
@@ -38,9 +39,12 @@ def report_pdf(persona,ranking,budget,hours,allocation,recommendation,range_text
     else:story.append(p('No optimal allocation available. Review inputs before using this report.'))
     for heading,text in [('Stress test',range_text),('Recommended validation experiment',recommendation),('Assumptions and limitations',assumptions),('Next actions','Validate cohort definitions and costs; audit task quality; verify channel ceilings and staff effort; pre-register the experiment and guardrails before allocating real spend.')]:
         story +=[Spacer(1,9),Paragraph(heading,styles['Heading3']),p(text)]
+    if details:
+        for title,text in details:
+            story += [Spacer(1,8),KeepTogether([Paragraph(escape(title),styles['Heading3']),p(text)])]
     doc.build(story);return buf.getvalue()
 
-def decision_ui(results,wage,persona,recommendation):
+def decision_ui(results,wage,persona,recommendation,experiment=None):
     if results.empty:return
     r=results.copy();r['Qualified yield']=r['Modeled qualified']/r.Contacts.replace(0,float('nan'))
     st.subheader('Efficiency versus scale')
@@ -82,7 +86,12 @@ def decision_ui(results,wage,persona,recommendation):
     st.subheader('Allocate a weekly budget')
     st.caption('Integer optimization maximizes expected first-task completions within budget, hours and channel ceilings. Costs and labor scale linearly per contact from your strategy inputs; no fixed costs, diminishing returns, or guaranteed outcomes. Zero-volume channels cannot be allocated until unit economics are defined.')
     a,b=st.columns(2);budget=a.number_input('Weekly acquisition budget ($)',0.,10000000.,5000.);hours=b.number_input('Weekly recruiter capacity (hours)',0.,100000.,40.)
-    caps=st.data_editor(pd.DataFrame({'Channel':r.Channel,'Maximum weekly contacts':r.Contacts.astype(int)}),disabled=['Channel'],hide_index=True,key='decision_caps')
+    ceiling_case=st.radio('Channel supply assumption',['Entered volumes','Referral ceiling: 100 / week'],horizontal=True)
+    ceiling=r.Contacts.astype(int).copy()
+    if ceiling_case.startswith('Referral'):
+        ceiling=r.apply(lambda x:min(int(x.Contacts),100) if 'referral' in x.Channel.lower() else int(x.Contacts),axis=1)
+    caps=st.data_editor(pd.DataFrame({'Channel':r.Channel,'Maximum weekly contacts':ceiling}),disabled=['Channel'],hide_index=True,key='decision_caps_'+ceiling_case)
+    st.caption('The 100-referral ceiling is an illustrative supply constraint, not an estimate of AfterQuery’s network. Compare both cases, then replace ceilings with verified weekly sourcing capacity.')
     limits=pd.to_numeric(caps['Maximum weekly contacts'],errors='coerce').to_numpy(float)
     if not np.isfinite(limits).all() or (limits<0).any() or (limits%1!=0).any():st.error('Channel ceilings must be nonnegative whole numbers.');return
     allocation=allocate(r,limits,budget,hours)
@@ -90,6 +99,19 @@ def decision_ui(results,wage,persona,recommendation):
     else:
         st.dataframe(allocation.round(2),hide_index=True)
         st.write(f'**{allocation["Expected activations"].sum():.1f} modeled activations** · ${allocation["Cost $"].sum():,.0f} / ${budget:,.0f} · {allocation.Hours.sum():.1f} / {hours:.1f} hours.')
+    unrestricted=allocate(r,r.Contacts.astype(int),budget,hours)
+    if allocation is not None and unrestricted is not None:
+        st.write(f'Entered-volume optimum: {unrestricted["Expected activations"].sum():.1f} completions. Supply-constrained optimum: {allocation["Expected activations"].sum():.1f}. Unused budget: ${budget-allocation["Cost $"].sum():,.0f}; unused hours: {hours-allocation.Hours.sum():.1f}.')
+        st.caption('Optimal only within the specified model. Hours can bind before money; unused budget is not an error. Verify prospect supply, per-contact effort, quality, and rate stability. Diminishing returns are not modeled.')
+    fixed=[]
+    if allocation is not None:
+        for case,g in stress.groupby('Case'):
+            merged=allocation.merge(g,on='Channel').merge(r[['Channel','Contacts']],on='Channel')
+            value=(merged['Allocated contacts']*merged['Expected activations_y']/merged.Contacts.replace(0,np.nan)).fillna(0).sum()
+            fixed.append({'Case':case,'Projected first-task completions':round(value,1),'Cost $':round(allocation['Cost $'].sum(),2),'Hours':round(allocation.Hours.sum(),2),'Efficiency leader':winners[case]})
+    st.write('**Stress test of the chosen allocation (contacts held fixed)**')
+    if fixed:st.dataframe(pd.DataFrame(fixed),hide_index=True)
+    st.caption('Only conversion changes: cost and hours remain fixed. This tests robustness of the chosen plan; it does not re-optimize each case or establish a confidence interval.')
     st.subheader('Quality and continuing contribution')
     st.caption('Separate editable assumptions, not observed outcomes. Activated already means first task completed. Accepted tasks = activations × [1 + retention × additional tasks per retained expert] × task acceptance. Retention refers to participation in the next 30 days.')
     q=st.data_editor(pd.DataFrame({'Channel':r.Channel,'Task acceptance %':80.,'30-day retention %':60.,'Additional tasks / retained expert':3.}),disabled=['Channel'],hide_index=True,key='decision_quality')
@@ -101,7 +123,12 @@ def decision_ui(results,wage,persona,recommendation):
     st.caption('Acquisition spend only: excludes expert task pay and delivery/review costs. These quality outputs use the entered channel plan, not the optimizer allocation.')
     st.subheader('Executive decision report')
     limitations='All outcomes are illustrative. Linear unit economics; integer contacts; no causal evidence, confidence intervals or quality equivalence. Channel rates come from the selected dataset; effort, costs and lifts are assumptions. Validate ceilings, cohort maturity, response quality and full delivery costs.'
-    pdf=report_pdf(persona,rank,budget,hours,allocation,recommendation,range_text,limitations)
+    details=[('Outcome definitions','Activation means first-task completion in this prototype, one completion per activated expert. Accepted tasks are a separate quality-adjusted output and may include repeat tasks; they are not unique people.'),('Supply constraints','; '.join(f'{c}: {int(v)} weekly contacts' for c,v in zip(r.Channel,limits))),('Numeric stress test — allocation held fixed','; '.join(f'{x["Case"]}: {x["Projected first-task completions"]} completions, ${x["Cost $"]}, {x["Hours"]}h; leader {x["Efficiency leader"]}' for x in fixed))]
+    if experiment:
+        for title,keys in [('Experiment design',['hypothesis','control','treatment','primary_metric','secondary_metric']),('Guardrails and feasibility',['guardrails','enrollment_days','followup_days','available_sample','required_per_arm_approx','constraints','decision_rule'])]:
+            details.append((title,' | '.join(k.replace('_',' ').title()+': '+str(experiment.get(k,'Not specified')) for k in keys)))
+    numeric='; '.join(f'{x["Case"]}: {x["Projected first-task completions"]} completions, ${x["Cost $"]}, {x["Hours"]}h' for x in fixed)
+    pdf=report_pdf(persona,rank,budget,hours,allocation,recommendation,numeric+'. '+range_text,limitations,details)
     st.download_button('Download executive strategy report (PDF)',pdf,'growth_strategy_report.pdf','application/pdf')
     st.download_button('Export sensitivity results',stress.to_csv(index=False),'channel_sensitivity.csv','text/csv')
-    st.caption('PDF is a concise decision brief; the strategy JSON export preserves detailed experiment fields and base assumptions.')
+    st.caption('PDF includes a decision brief and supporting experiment detail; the strategy JSON export preserves detailed experiment fields and base assumptions.')
