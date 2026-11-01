@@ -12,10 +12,11 @@ import streamlit.components.v1 as components
 from engine import *
 from views import funnel_html,heatmap_html,timeline_html,demo_html,rate_text
 from sourcing_ui import discovery_ui,outreach_ui
+from strategy import strategy_ui
 
 st.set_page_config(page_title='Expert Pipeline | Darrin Fan',page_icon='◈',layout='wide')
 st.markdown(Path(__file__).with_name('style.html').read_text(),unsafe_allow_html=True)
-PAGES=['Overview','Follow-up queue','Pipeline performance','Capacity planner','Experiment plan','Data quality','Expert discovery','Outreach drafts']
+PAGES=['Overview','Follow-up queue','Pipeline performance','Channel strategy','Capacity planner','Experiment plan','Data quality','Expert discovery','Outreach drafts']
 def slug(s):return s.lower().replace(' ','-')
 def jump(label,destination):st.markdown(f'<a class="section-link" href="#{slug(destination)}" target="_self">{escape(label)}</a>',unsafe_allow_html=True)
 def section(name,title,line):st.markdown(f'<section id="{slug(name)}" class="chapter-heading"><div class="eyebrow">{escape(name)}</div><h2>{title}</h2><p>{line}</p></section>',unsafe_allow_html=True)
@@ -71,6 +72,8 @@ if data_error:st.warning(data_error)
 
 st.markdown(f'<div id="overview" class="chapter-heading hero"><div class="eyebrow">A WEEK-ONE GROWTH OPERATIONS APPROACH</div><h1>{len(queue):,} qualified experts<br><span>waiting {threshold}+ days.</span></h1><p>{rate_text(len(queue),counts[2])} qualified records have no activation event. Inspect the queue, record a reason, and test a fix.</p></div>',unsafe_allow_html=True)
 st.markdown('<p class="pitch">“The data is invented, but this is how I’d find stalled experts, size the prize and test a fix on your real export.”</p>',unsafe_allow_html=True)
+st.caption('How to use: 1. Inspect the qualified queue. 2. Compare channel strategies and staffing. 3. Export a pilot with explicit assumptions.')
+jump('Choose the next experiment →','Channel strategy')
 with st.expander('Watch the 30-second walkthrough',expanded=False):
     st.caption('Fixed illustrative example · October 28, 2026 · 14-day threshold. The animation does not change with uploads or planner settings. Command text illustrates the workflow; it is not an executable CLI.')
     components.html(Path(__file__).with_name('walkthrough.html').read_text(),height=790,scrolling=True)
@@ -160,6 +163,9 @@ else:
     st.dataframe(pd.DataFrame(metrics),hide_index=True,width='stretch')
     st.caption('Time includes completed activations only (survivorship bias). Cost = all recorded acquisition cost in the channel / activations, not incremental recovery cost. Sample costs are invented; missing uploaded costs remain unavailable.')
     st.download_button('Export channel analysis',csv(summary),'channel_analysis.csv','text/csv')
+
+section('Channel strategy','Compare strategies. <span>Choose what to test.</span>','Model channel allocation for a target persona, inspect tradeoffs, and export a testable proposal.')
+strategy_ui(summary)
 
 section('Capacity planner','Match the target <span>to the available hours.</span>','Defaults use the same observed sample funnel above. Compare scenarios without confusing assumptions with measured results.')
 results_slot=st.container()
@@ -276,7 +282,7 @@ st.caption('The included daily_digest.py creates a local digest and previous-run
 repo=os.getenv('PUBLIC_REPO_URL','https://github.com/darrinfan12/project')
 if repo:st.link_button('Inspect the source repository',repo)
 else:
-    source_files=['app.py','engine.py','views.py','sourcing_ui.py','outreach.py','daily_digest.py','requirements.txt','README.md','style.html','scroll.html','walkthrough.html','.streamlit/config.toml']
+    source_files=['strategy.py','app.py','engine.py','views.py','sourcing_ui.py','outreach.py','daily_digest.py','requirements.txt','README.md','style.html','scroll.html','walkthrough.html','.streamlit/config.toml']
     import io,zipfile
     buffer=io.BytesIO()
     with zipfile.ZipFile(buffer,'w',zipfile.ZIP_DEFLATED) as archive:
